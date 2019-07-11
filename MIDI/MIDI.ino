@@ -6,7 +6,7 @@
 /* MIDI */
 
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI); //TODO: Confirm channel 2 creation / operation
+//MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI); //TODO: Confirm channel 2 creation / operation
 const int channel1 = 1;
 const int channel2 = 2;
 
@@ -95,8 +95,8 @@ void loop() {
   /* Nunchuk */
   if (nunchuk_read()) {
     // Work with nunchuk_data 
-    posX = nunchuk_joystickX();
-    posY = nunchuk_joystickY();
+    posX = nunchuk_joystickX(); // +/- 100
+    posY = nunchuk_joystickY(); // +/- 100
 
     // TODO: Map the nunchuk x / y to a modulation or distortion and send as part of the midi packet 
   }
@@ -129,7 +129,7 @@ void printInfo() {
   Serial.print(cap1);
   Serial.print(" \t Cap2: ");
   Serial.print(cap2);
-  Serial.print(" /t Nunchuk: ");
+  Serial.print(" \t Nunchuk: ");
   nunchuk_print();
   
   Serial.println("");
