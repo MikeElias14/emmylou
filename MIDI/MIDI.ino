@@ -1,118 +1,149 @@
-#include <CapacitiveSensor.h>
 #include <MIDI.h>
+#include <Wire.h>
+#include <Nunchuk.h> // made some modifications to make it easier to use what we need
+#include <Adafruit_MPR121.h>
 
 /* MIDI */
+
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
-const int channel = 1;
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI); //TODO: Confirm channel 2 creation / operation
+const int channel1 = 1;
+const int channel2 = 2;
 
 /* Force */
 
-CapacitiveSensor string = CapacitiveSensor(4, 2); // pin 2 is sensor pin
+#ifndef _BV
+#define _BV(bit) (1 << (bit)) 
+#endif
 
-int capMax = 0;
-int capMin = 50;
-int cap = 0;
-int vel = 0; // 1-127
+int capSensePin1 = 10;
+int capSensePin2 = 11;
 
-int note1 = 0;
-int note2 = 0;
+// You can have up to 4 on one i2c
+Adafruit_MPR121 capSense = Adafruit_MPR121();
+
+uint16_t base1 = 0;
+uint16_t base2 = 0;
+
+uint16_t cap1 = 0;
+uint16_t cap2 = 0;
+
+int vel1 = 0; // 1-127
+int vel2 = 0; // 1-127
 
 /* Position */
 
 int posPin1 = 0; // Analog
-int pos1 = 0; // 0 - 1024
-int bend1 = 0; // 0 - 16383
-
 int posPin2 = 1; // Analog
+
+int pos1 = 0; // 0 - 1024
 int pos2 = 0; // 0 - 1024
+
+int bend1 = 0; // 0 - 16383
 int bend2 = 0; // 0 - 16383
 
-int prev1 = 0;
-int prev2 = 0;
+/* nunchuk */
+int posX = 0;
+int posY = 0;
 
 void setup() {
   Serial.begin(9600);
   usbMIDI.begin();
-  delay(100);
-  usbMIDI.sendProgramChange(41, channel); //violin
+  Wire.begin();
+
+  // Change TWI speed for nuchuk, which uses Fast-TWI (400kHz)
+  Wire.setClock(400000);
+  
+  nunchuk_init();
+
+  if (!capSense.begin(0x5A)) {
+    Serial.println("MPR121 not found, check wiring?");
+    while (1);
+  }
+  
+  Serial.println("MPR121 found!");
+  Calibrate();
+
+  /* Set Up Midi */
+
+  /* MIDI Bass sound */
+  usbMIDI.sendProgramChange(36, channel1);
+  usbMIDI.sendProgramChange(36, channel2);
+  
+  /* Pitchbend one octave */
+  usbMIDI.sendControlChange(6, 6, channel1);
+  usbMIDI.sendControlChange(101, 0, channel1);
+  usbMIDI.sendControlChange(100, 0, channel1);
+
+  usbMIDI.sendControlChange(6, 6, channel2);
+  usbMIDI.sendControlChange(101, 0, channel2);
+  usbMIDI.sendControlChange(100, 0, channel2);
+
+  // TODO - Allyson: configure the ADSR for both channels.
+    
 }
 
 void loop() {
-  /* Position - Pitchbend*/
-
-//  usbMIDI.sendProgramChange(41, channel); //violin - NOTE jst for my midi thing
-
-  /* for changing pitchbend range. Ideally just put this in the setup, but my midi thing doesnt boot fast enough */
-  usbMIDI.sendControlChange(6, 6, channel);
-  usbMIDI.sendControlChange(101, 0, channel);
-  usbMIDI.sendControlChange(100, 0, channel);
   
+  /* Position */  
   pos1 = analogRead(posPin1);
   pos2 = analogRead(posPin2);
 
-  Serial.print("pos1: ");
-  Serial.print(pos1);
-  Serial.print("\t");
-
-  Serial.print("pos2: ");
-  Serial.print(pos2);
-  Serial.print("\t");
-
   bend1 = map(pos1, 0, 1024, 0, 16383);
   bend2 = map(pos2, 0, 1024, 0, 16383);
+  
+  /* Nunchuk */
+  if (nunchuk_read()) {
+    // Work with nunchuk_data 
+    posX = nunchuk_joystickX();
+    posY = nunchuk_joystickY();
 
-  Serial.print("Bend1: ");
-  Serial.print(bend1);
-  Serial.print("\t");
+    // TODO: Map the nunchuk x / y to a modulation or distortion and send as part of the midi packet 
+  }
 
-  Serial.print("Bend2: ");
-  Serial.print(bend2);
-  Serial.print("\t");
+  /* Cap */
+  cap1 = capSense.filteredData(capSensePin1);
+  cap2 = capSense.filteredData(capSensePin2);
 
-//  /* Cap - Velocity */
-//
-//  long start = millis();
-//  long cap =  string.capacitiveSensor(30);
-//
-//  Serial.print("Cap: ");
-//  Serial.print(cap);
-//  Serial.print("\t");
-//
-//  if (cap > capMax){
-//    capMax = cap;
-//  }
-//
-//  if (cap < capMin) {
-//    cap = 0;
-//  }
-//
-//  vel = map(cap, 0, capMax, 0, 127);
-//
-//  Serial.print("Vel: ");
-//  Serial.print(vel);
-//  Serial.print("\t");
-
+  vel1 = map(cap1, base1, 0, 127, 0);
+  vel2 = map(cap2, base2, 0, 127, 0);
 
   /* Play Note */
-//  if (bend1 >= 1000) {
-//    usbMIDI.sendNoteOn(65, 100, channel);
-//    usbMIDI.sendPitchBend(bend1, channel);
-//    delay(10);
-//    usbMIDI.sendNoteOff(65, 100, channel);
-//  }
+  // TODO - Allyson: Create the play note loops based on the sensed vel / bend
+    // Req: - Send on
+        //  - update pitchbend and modulation / distortion
+        //  - Once note is released send off
 
-  note2 = map(pos2, 0, 1024, 60, 80);
-
-  if (bend2 > 2000 && ((bend2 + 100) < prev2 || (bend2 - 100) > prev2 )) {
-//    usbMIDI.sendNoteOn(57, 100, channel);
-//    usbMIDI.sendPitchBend(bend2, channel);
-    usbMIDI.sendNoteOn(note2, 100, channel);
-    delay(50);
-    prev2 = bend2;
-//    usbMIDI.sendNoteOff(57, 100, channel); //just constantly send note with velocity. no need to turn off
-  }
+  /* Print Raw Valuese for Debug */
+  printInfo();
   
+  delay(10);
+}
 
+void printInfo() {
+  Serial.print("Pos1: ");
+  Serial.print(pos1);
+  Serial.print(" \t Pos2: ");
+  Serial.print(pos2);
+  Serial.print(" \t Cap1: ");
+  Serial.print(cap1);
+  Serial.print(" \t Cap2: ");
+  Serial.print(cap2);
+  Serial.print(" /t Nunchuk: ");
+  nunchuk_print();
+  
   Serial.println("");
-//  delay(100);
+}
+
+void Calibrate(){
+  // Need a bit of delay so that MPR121 has time to start up
+  delay(400);
+  
+  base1 = capSense.filteredData(capSensePin1);
+  base2 = capSense.filteredData(capSensePin2);
+  
+  Serial.print("Base1: " );
+  Serial.println(base1);
+  Serial.print("Base2: " );
+  Serial.println(base2);
 }
