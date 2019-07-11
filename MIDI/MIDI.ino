@@ -40,7 +40,7 @@ void setup() {
 void loop() {
   /* Position - Pitchbend*/
 
-//  usbMIDI.sendProgramChange(41, channel); //violin - NOTE jst for my midi thing
+  usbMIDI.sendProgramChange(36, channel); //violin - NOTE jst for my midi thing
 
   /* for changing pitchbend range. Ideally just put this in the setup, but my midi thing doesnt boot fast enough */
   usbMIDI.sendControlChange(6, 6, channel);
@@ -109,7 +109,7 @@ void loop() {
     usbMIDI.sendNoteOn(note2, 100, channel);
     delay(50);
     prev2 = bend2;
-//    usbMIDI.sendNoteOff(57, 100, channel); //just constantly send note with velocity. no need to turn off
+    usbMIDI.sendNoteOff(note2, 100, channel); //just constantly send note with velocity. no need to turn off
   }
   
 
