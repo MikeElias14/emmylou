@@ -1,73 +1,60 @@
 #include <CapacitiveSensor.h>
 #include <MIDI.h>
 
-/* MIDI */
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
-const int channel = 1;
-
 /* Force */
-
 CapacitiveSensor string = CapacitiveSensor(4, 2); // pin 2 is sensor pin
-
 int capMax = 0;
 int capMin = 50;
 int cap = 0;
 int vel = 0; // 1-127
 
-int note1 = 0;
-int note2 = 0;
 
-/* Position */
+/* MIDI SETTINGS - CHANGE THESE AS YOU LIKE */
+int sustainVal = 0; //determines how long note continues after you lift your finger
+int bendThreshold = 0; //determines how easily it will detect a bend
+int pent1BottomThresh = 670; //lowest analogRead value of first softpot
+int pent1TopThresh = 1024; //highest analogRead value of first softpot
+int pent2BottomThresh = 670; //lowest analogRead value of second softpot
+int pent2TopThresh = 1024; //highest analogRead value of second softpot
 
-int posPin1 = 0; // Analog
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
+const int channel = 1;
+
+//Vars for first softpot
+int posPin1 = A1; //analog
 int pos1 = 0; // 0 - 1024
-int bend1 = 0; // 0 - 16383
+int note1 = 0;
+int oldNote1 = 0;
+int bend1 = 0;
+int oldBend1 = 0;
+boolean fingerDown1 = false;
+int pos1BaseNote = 65;
 
-int posPin2 = 1; // Analog
+//Vars for second softpot
+int posPin2 = A2; //analog
 int pos2 = 0; // 0 - 1024
-int bend2 = 0; // 0 - 16383
+int note2 = 0;
+int oldNote2 = 0;
+int bend2 = 0;
+int oldBend2 = 0;
+boolean fingerDown2 = false;
+int pos2BaseNote = 57;
 
-int prev1 = 0;
-int prev2 = 0;
 
 void setup() {
   Serial.begin(9600);
   usbMIDI.begin();
-  delay(100);
-  usbMIDI.sendProgramChange(41, channel); //violin
-}
-
-void loop() {
-  /* Position - Pitchbend*/
-
-  usbMIDI.sendProgramChange(36, channel); //violin - NOTE jst for my midi thing
-
-  /* for changing pitchbend range. Ideally just put this in the setup, but my midi thing doesnt boot fast enough */
+  pinMode(posPin1, INPUT_PULLDOWN);
+  pinMode(posPin2, INPUT_PULLDOWN);
+  usbMIDI.sendProgramChange(41, channel); //bass
   usbMIDI.sendControlChange(6, 6, channel);
   usbMIDI.sendControlChange(101, 0, channel);
   usbMIDI.sendControlChange(100, 0, channel);
-  
-  pos1 = analogRead(posPin1);
-  pos2 = analogRead(posPin2);
+}
 
-  Serial.print("pos1: ");
-  Serial.print(pos1);
-  Serial.print("\t");
-
-  Serial.print("pos2: ");
-  Serial.print(pos2);
-  Serial.print("\t");
-
-  bend1 = map(pos1, 0, 1024, 0, 16383);
-  bend2 = map(pos2, 0, 1024, 0, 16383);
-
-  Serial.print("Bend1: ");
-  Serial.print(bend1);
-  Serial.print("\t");
-
-  Serial.print("Bend2: ");
-  Serial.print(bend2);
-  Serial.print("\t");
+void loop() {
+  play(pos1, posPin1, fingerDown1, note1, oldNote1, bend1, oldBend1, pent1BottomThresh, pent1TopThresh, pos1BaseNote);
+  play(pos2, posPin2, fingerDown2, note2, oldNote2, bend2, oldBend2, pent2BottomThresh, pent2TopThresh, pos2BaseNote);
 
 //  /* Cap - Velocity */
 //
@@ -92,27 +79,41 @@ void loop() {
 //  Serial.print(vel);
 //  Serial.print("\t");
 
+}
 
-  /* Play Note */
-//  if (bend1 >= 1000) {
-//    usbMIDI.sendNoteOn(65, 100, channel);
-//    usbMIDI.sendPitchBend(bend1, channel);
-//    delay(10);
-//    usbMIDI.sendNoteOff(65, 100, channel);
-//  }
+void play(int pos, int posPin, boolean& fingerDown, int note, int& oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote) {
+  pos = analogRead(posPin);
+//  Serial.print("pos: ");
+//  Serial.print(pos);
+//  Serial.print("\n");
 
-  note2 = map(pos2, 0, 1024, 60, 80);
+  note = map(pos, pentBottomThresh, pentTopThresh, 60, 80);
+  Serial.print("note: ");
+  Serial.print(note);
+  Serial.print("\n");
 
-  if (bend2 > 2000 && ((bend2 + 100) < prev2 || (bend2 - 100) > prev2 )) {
-//    usbMIDI.sendNoteOn(57, 100, channel);
-//    usbMIDI.sendPitchBend(bend2, channel);
-    usbMIDI.sendNoteOn(note2, 100, channel);
-    delay(50);
-    prev2 = bend2;
-    usbMIDI.sendNoteOff(note2, 100, channel); //just constantly send note with velocity. no need to turn off
-  }
-  
-
-  Serial.println("");
-//  delay(100);
+  bend = map(note, 60, 80, 0, 6383);
+//  Serial.print("map: ");
+//  Serial.print(bend);
+//  Serial.print("\n");
+//  
+  if (note > 60 && note < 80) {
+    if (!fingerDown) {
+      usbMIDI.sendNoteOn(baseNote, 100, channel);
+      usbMIDI.sendPitchBend(bend, channel);
+      fingerDown = true;
+      delay(10);
+      oldNote = note;
+      oldBend = bend;
+    }
+    else if (bend > (oldBend + bendThreshold) || bend < (oldBend - bendThreshold)) {
+      usbMIDI.sendPitchBend(bend, channel);
+      delay(10);
+      oldBend = bend;
+     }
+   } else if (note < 60 || note > 80) {
+     fingerDown = false;
+     delay(sustainVal);
+     usbMIDI.sendNoteOff(baseNote, 100, channel);
+   }
 }
