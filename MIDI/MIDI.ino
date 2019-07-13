@@ -10,6 +10,35 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
 const int channel1 = 1;
 const int channel2 = 2;
 
+/* MIDI SETTINGS - CHANGE THESE AS YOU LIKE */
+int sustainVal = 0; //determines how long note continues after you lift your finger
+int bendThreshold = 0; //determines how easily it will detect a bend
+int pent1BottomThresh = 670; //lowest analogRead value of first softpot
+int pent1TopThresh = 1024; //highest analogRead value of first softpot
+int pent2BottomThresh = 670; //lowest analogRead value of second softpot
+int pent2TopThresh = 1024; //highest analogRead value of second softpot
+
+//Vars for first softpot
+int posPin1 = A1; //analog
+int pos1 = 0; // 0 - 1024
+int note1 = 0;
+int oldNote1 = 0;
+int bend1 = 0;
+int oldBend1 = 0;
+boolean fingerDown1 = false;
+int pos1BaseNote = 65;
+
+//Vars for second softpot
+int posPin2 = A2; //analog
+int pos2 = 0; // 0 - 1024
+int note2 = 0;
+int oldNote2 = 0;
+int bend2 = 0;
+int oldBend2 = 0;
+boolean fingerDown2 = false;
+int pos2BaseNote = 57;
+
+
 /* Force */
 
 #ifndef _BV
@@ -31,17 +60,6 @@ uint16_t cap2 = 0;
 int vel1 = 0; // 1-127
 int vel2 = 0; // 1-127
 
-/* Position */
-
-int posPin1 = 0; // Analog
-int posPin2 = 1; // Analog
-
-int pos1 = 0; // 0 - 1024
-int pos2 = 0; // 0 - 1024
-
-int bend1 = 0; // 0 - 16383
-int bend2 = 0; // 0 - 16383
-
 /* nunchuk */
 int posX = 0;
 int posY = 0;
@@ -51,6 +69,13 @@ void setup() {
   usbMIDI.begin();
   Wire.begin();
 
+  //MIDI
+  pinMode(posPin1, INPUT_PULLDOWN);
+  pinMode(posPin2, INPUT_PULLDOWN);
+  usbMIDI.sendProgramChange(41, channel1); //bass
+  usbMIDI.sendProgramChange(41, channel2); //bass
+
+  
   // Change TWI speed for nuchuk, which uses Fast-TWI (400kHz)
   Wire.setClock(400000);
   
@@ -84,7 +109,6 @@ void setup() {
 }
 
 void loop() {
-  
   /* Position */  
   pos1 = analogRead(posPin1);
   pos2 = analogRead(posPin2);
@@ -109,15 +133,38 @@ void loop() {
   vel2 = map(cap2, base2, 0, 127, 0);
 
   /* Play Note */
-  // TODO - Allyson: Create the play note loops based on the sensed vel / bend
-    // Req: - Send on
-        //  - update pitchbend and modulation / distortion
-        //  - Once note is released send off
-
+  play(pos1, posPin1, fingerDown1, note1, oldNote1, bend1, oldBend1, pent1BottomThresh, pent1TopThresh, pos1BaseNote, channel1);
+  play(pos2, posPin2, fingerDown2, note2, oldNote2, bend2, oldBend2, pent2BottomThresh, pent2TopThresh, pos2BaseNote, channel2);
   /* Print Raw Valuese for Debug */
   printInfo();
   
   delay(10);
+}
+
+void play(int pos, int posPin, boolean& fingerDown, int note, int& oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote, int channel) {
+  pos = analogRead(posPin);
+  note = map(pos, pentBottomThresh, pentTopThresh, 60, 80);
+  bend = map(note, 60, 80, 0, 6383);
+
+  if (note > 60 && note < 80) {
+    if (!fingerDown) {
+      usbMIDI.sendNoteOn(baseNote, 100, channel);
+      usbMIDI.sendPitchBend(bend, channel);
+      fingerDown = true;
+      delay(10);
+      oldNote = note;
+      oldBend = bend;
+    }
+    else if (bend > (oldBend + bendThreshold) || bend < (oldBend - bendThreshold)) {
+      usbMIDI.sendPitchBend(bend, channel);
+      delay(10);
+      oldBend = bend;
+     }
+   } else if (note < 60 || note > 80) {
+     fingerDown = false;
+     delay(sustainVal);
+     usbMIDI.sendNoteOff(baseNote, 100, channel);
+   }
 }
 
 void printInfo() {
