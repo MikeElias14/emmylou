@@ -38,6 +38,10 @@ int oldBend2 = 0;
 boolean fingerDown2 = false;
 int pos2BaseNote = 57;
 
+/* Default ASDR values */
+int current_decay = 64 // default is 0x40 (65 decimal) and ranges from 0 to 127
+int current_attack = 64
+
 
 /* Force */
 
@@ -74,6 +78,8 @@ void setup() {
   pinMode(posPin2, INPUT_PULLDOWN);
   usbMIDI.sendProgramChange(41, channel1); //bass
   usbMIDI.sendProgramChange(41, channel2); //bass
+  usbMIDI.sendProgramChange(124, 0, channel1);
+  usbMIDI.sendProgramChange(124, 0, channel2);
 
   
   // Change TWI speed for nuchuk, which uses Fast-TWI (400kHz)
@@ -122,7 +128,28 @@ void loop() {
     posX = nunchuk_joystickX(); // +/- 100
     posY = nunchuk_joystickY(); // +/- 100
 
-    // TODO: Map the nunchuk x / y to a modulation or distortion and send as part of the midi packet 
+    if(posX < 0  && current_decay > 0) {
+      // decrease decay value
+      current_decay --;
+      usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
+      usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
+    }
+    else if (posX > 0 && current_decay < 127) {
+      current_decay ++;
+      usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
+      usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
+    }
+    if(posY < 0 && current_attack > 0) {
+      current_attack --;
+      usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
+      usbMIDI.sendControlChange(byte(73), byte(current_attack), channel2);
+    }
+    else if (posY > 0 && current_attack < 127) {
+      current_attack ++;
+      usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
+      usbMIDI.sendControlChange(byte(73), byte(current_attack), channel2);
+    }
+    
   }
 
   /* Cap */
