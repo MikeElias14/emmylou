@@ -129,22 +129,25 @@ void loop() {
     posY = nunchuk_joystickY(); // +/- 100
 
     if(posX < 0  && current_decay > 0) {
-      // decrease decay value
+      // If joystick is on the negative X position, decrement the decay value (if it is not at the minimum already)
       current_decay --;
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
     }
     else if (posX > 0 && current_decay < 127) {
+      // If joystick is on the positive X position, increment the decay value (if it is not at the maximum already)
       current_decay ++;
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
     }
     if(posY < 0 && current_attack > 0) {
+      // If joystick is on the negative Y position, decrement the attack value (if it is not at the minimum already)
       current_attack --;
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel2);
     }
     else if (posY > 0 && current_attack < 127) {
+      // If joystick is on the positive Y position, increment the attack value (if it is not at the maximum already)
       current_attack ++;
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel2);
