@@ -11,7 +11,7 @@ const int channel1 = 1;
 const int channel2 = 2;
 
 /* MIDI SETTINGS - CHANGE THESE AS YOU LIKE */
-int sustainVal = 0; //determines how long note continues after you lift your finger
+int sustainVal = 50; //determines how long note continues after you lift your finger
 int bendThreshold = 0; //determines how easily it will detect a bend
 int pent1BottomThresh = 670; //lowest analogRead value of first softpot
 int pent1TopThresh = 1024; //highest analogRead value of first softpot
@@ -29,7 +29,7 @@ boolean fingerDown1 = false;
 int pos1BaseNote = 65;
 
 //Vars for second softpot
-int posPin2 = A2; //analog
+int posPin2 = A0; //analog
 int pos2 = 0; // 0 - 1024
 int note2 = 0;
 int oldNote2 = 0;
@@ -39,8 +39,8 @@ boolean fingerDown2 = false;
 int pos2BaseNote = 57;
 
 /* Default ASDR values */
-int current_decay = 64 // default is 0x40 (65 decimal) and ranges from 0 to 127
-int current_attack = 64
+int current_decay = 64; // default is 0x40 (65 decimal) and ranges from 0 to 127
+int current_attack = 64;
 
 
 /* Force */
@@ -128,25 +128,26 @@ void loop() {
     posX = nunchuk_joystickX(); // +/- 100
     posY = nunchuk_joystickY(); // +/- 100
 
-    if(posX < 0  && current_decay > 0) {
+    if(posX < -10  && current_decay > 0) {
+//      Serial.println("SEND1");
       // If joystick is on the negative X position, decrement the decay value (if it is not at the minimum already)
       current_decay --;
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
     }
-    else if (posX > 0 && current_decay < 127) {
+    else if (posX > 10 && current_decay < 127) {
       // If joystick is on the positive X position, increment the decay value (if it is not at the maximum already)
       current_decay ++;
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel1);
       usbMIDI.sendControlChange(byte(75), byte(current_decay), channel2);
     }
-    if(posY < 0 && current_attack > 0) {
+    if(posY < -10 && current_attack > 0) {
       // If joystick is on the negative Y position, decrement the attack value (if it is not at the minimum already)
       current_attack --;
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel2);
     }
-    else if (posY > 0 && current_attack < 127) {
+    else if (posY > 10 && current_attack < 127) {
       // If joystick is on the positive Y position, increment the attack value (if it is not at the maximum already)
       current_attack ++;
       usbMIDI.sendControlChange(byte(73), byte(current_attack), channel1);
@@ -166,31 +167,35 @@ void loop() {
   play(pos1, posPin1, fingerDown1, note1, oldNote1, bend1, oldBend1, pent1BottomThresh, pent1TopThresh, pos1BaseNote, channel1);
   play(pos2, posPin2, fingerDown2, note2, oldNote2, bend2, oldBend2, pent2BottomThresh, pent2TopThresh, pos2BaseNote, channel2);
   /* Print Raw Valuese for Debug */
-  printInfo();
+//  printInfo();
   
   delay(10);
 }
 
-void play(int pos, int posPin, boolean& fingerDown, int note, int& oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote, int channel) {
+void play(int pos, int posPin, boolean &fingerDown, int &note, int &oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote, int channel) {
+      
   pos = analogRead(posPin);
   note = map(pos, pentBottomThresh, pentTopThresh, 60, 80);
   bend = map(note, 60, 80, 0, 6383);
 
-  if (note > 60 && note < 80) {
+  if (note > 25 && note < 80) {
     if (!fingerDown) {
       usbMIDI.sendNoteOn(baseNote, 100, channel);
       usbMIDI.sendPitchBend(bend, channel);
+      
       fingerDown = true;
       delay(10);
       oldNote = note;
       oldBend = bend;
+      delay(100);
     }
     else if (bend > (oldBend + bendThreshold) || bend < (oldBend - bendThreshold)) {
       usbMIDI.sendPitchBend(bend, channel);
       delay(10);
       oldBend = bend;
      }
-   } else if (note < 60 || note > 80) {
+
+   } else if ((note < 25 || note > 80) && (abs(nunchuk_joystickX()) <= 10 && abs(nunchuk_joystickY()) <= 10) && fingerDown) {
      fingerDown = false;
      delay(sustainVal);
      usbMIDI.sendNoteOff(baseNote, 100, channel);
@@ -198,16 +203,19 @@ void play(int pos, int posPin, boolean& fingerDown, int note, int& oldNote, int 
 }
 
 void printInfo() {
-  Serial.print("Pos1: ");
-  Serial.print(pos1);
-  Serial.print(" \t Pos2: ");
-  Serial.print(pos2);
-  Serial.print(" \t Cap1: ");
-  Serial.print(cap1);
-  Serial.print(" \t Cap2: ");
-  Serial.print(cap2);
-  Serial.print(" \t Nunchuk: ");
-  nunchuk_print();
+//  Serial.print("Pos1: ");
+//  Serial.print(analogRead(posPin1));
+//  Serial.print(" \t Pos2: ");
+//  Serial.print(analogRead(posPin2));
+//  Serial.print(" \t Cap1: ");
+//  Serial.print(cap1);
+//  Serial.print(" \t Cap2: ");
+//  Serial.print(cap2);
+//  Serial.print(" \t Nunchuk: ");
+  Serial.print("decay: ");
+  Serial.println(current_decay);
+  Serial.print("attack: ");
+  Serial.println(current_attack);
   
   Serial.println("");
 }
