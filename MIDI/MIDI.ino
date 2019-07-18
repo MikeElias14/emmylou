@@ -39,8 +39,8 @@ boolean fingerDown2 = false;
 int pos2BaseNote = 57;
 
 /* Default ASDR values */
-int current_decay = 64 // default is 0x40 (65 decimal) and ranges from 0 to 127
-int current_attack = 64
+int current_decay = 64; // default is 0x40 (65 decimal) and ranges from 0 to 127
+int current_attack = 64;
 
 
 /* Force */
