@@ -155,24 +155,29 @@ void loop() {
     }
     
   }
+  // If Nunchuck is not being operated reset the mapped values to default values
+  else{
+    current_decay = 64;
+    current_attack = 64;
+  }
 
   /* Cap */
   cap1 = capSense.filteredData(capSensePin1);
   cap2 = capSense.filteredData(capSensePin2);
 
-  vel1 = map(cap1, base1, 0, 127, 0);
-  vel2 = map(cap2, base2, 0, 127, 0);
+  vel1 = map(cap1, base1, 0, 0, 127);
+  vel2 = map(cap2, base2, 0, 0, 127);
 
   /* Play Note */
-  play(pos1, posPin1, fingerDown1, note1, oldNote1, bend1, oldBend1, pent1BottomThresh, pent1TopThresh, pos1BaseNote, channel1);
-  play(pos2, posPin2, fingerDown2, note2, oldNote2, bend2, oldBend2, pent2BottomThresh, pent2TopThresh, pos2BaseNote, channel2);
+  play(pos1, posPin1, fingerDown1, note1, oldNote1, bend1, oldBend1, pent1BottomThresh, pent1TopThresh, pos1BaseNote, channel1, vel1);
+  play(pos2, posPin2, fingerDown2, note2, oldNote2, bend2, oldBend2, pent2BottomThresh, pent2TopThresh, pos2BaseNote, channel2, vel2);
   /* Print Raw Valuese for Debug */
-//  printInfo();
+  printInfo();
   
   delay(10);
 }
 
-void play(int pos, int posPin, boolean &fingerDown, int &note, int &oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote, int channel) {
+void play(int pos, int posPin, boolean &fingerDown, int &note, int &oldNote, int bend, int& oldBend, int pentBottomThresh, int pentTopThresh, int baseNote, int channel, int vel) {
       
   pos = analogRead(posPin);
   note = map(pos, pentBottomThresh, pentTopThresh, 60, 80);
@@ -180,7 +185,7 @@ void play(int pos, int posPin, boolean &fingerDown, int &note, int &oldNote, int
 
   if (note > 25 && note < 80) {
     if (!fingerDown) {
-      usbMIDI.sendNoteOn(baseNote, 100, channel);
+      usbMIDI.sendNoteOn(baseNote, vel, channel);
       usbMIDI.sendPitchBend(bend, channel);
       
       fingerDown = true;
@@ -198,24 +203,28 @@ void play(int pos, int posPin, boolean &fingerDown, int &note, int &oldNote, int
    } else if ((note < 25 || note > 80) && (abs(nunchuk_joystickX()) <= 10 && abs(nunchuk_joystickY()) <= 10) && fingerDown) {
      fingerDown = false;
      delay(sustainVal);
-     usbMIDI.sendNoteOff(baseNote, 100, channel);
+     usbMIDI.sendNoteOff(baseNote, vel, channel);
    }
 }
 
 void printInfo() {
-//  Serial.print("Pos1: ");
-//  Serial.print(analogRead(posPin1));
-//  Serial.print(" \t Pos2: ");
-//  Serial.print(analogRead(posPin2));
-//  Serial.print(" \t Cap1: ");
-//  Serial.print(cap1);
-//  Serial.print(" \t Cap2: ");
-//  Serial.print(cap2);
+  Serial.print("Pos1: ");
+  Serial.print(analogRead(posPin1));
+  Serial.print(" \t Pos2: ");
+  Serial.print(analogRead(posPin2));
+  Serial.print(" \t Cap1: ");
+  Serial.print(cap1);
+  Serial.print(" \t Cap2: ");
+  Serial.print(cap2);
+  Serial.print(" \t Vel1: ");
+  Serial.print(vel1);
+  Serial.print(" \t Vel2: ");
+  Serial.print(vel2);
 //  Serial.print(" \t Nunchuk: ");
-  Serial.print("decay: ");
-  Serial.println(current_decay);
-  Serial.print("attack: ");
-  Serial.println(current_attack);
+//  Serial.print("decay: ");
+//  Serial.println(current_decay);
+//  Serial.print("attack: ");
+//  Serial.println(current_attack);
   
   Serial.println("");
 }
